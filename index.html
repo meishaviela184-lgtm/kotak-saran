@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kotak Saran</title>
+
+  <!-- Firebase SDK versi CDN kompatibel -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 500px;
+      margin: 0 auto;
+      background-color: #f4f6f9;
+    }
+    .card {
+      background: white;
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      text-align: center;
+    }
+    h2 { margin-top: 0; color: #333; }
+    p { color: #666; font-size: 14px; }
+    button {
+      background-color: #1a73e8;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 10px;
+    }
+    button:disabled { background-color: #ccc; cursor: not-allowed; }
+    textarea {
+      width: 100%;
+      height: 100px;
+      margin-top: 15px;
+      padding: 10px;
+      box-sizing: border-box;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      resize: vertical;
+    }
+    .hidden { display: none; }
+    #status { margin-top: 15px; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h2>Kotak Saran</h2>
+
+    <!-- Tampilan Sebelum Login -->
+    <div id="login-section">
+      <p>Silakan login dengan Google untuk mengirimkan 1 saran Anda.</p>
+      <button onclick="loginGoogle()">Login dengan Google</button>
+    </div>
+
+    <!-- Tampilan Setelah Login -->
+    <div id="form-section" class="hidden">
+      <p>Halo, <span id="user-name"></span>!</p>
+      <textarea id="saran-input" placeholder="Tuliskan saran Anda di sini..."></textarea>
+      <button id="btn-kirim" onclick="kirimSaran()">Kirim Saran</button>
+    </div>
+
+    <div id="status"></div>
+  </div>
+
+  <script>
+    // Konfigurasi Firebase Asli Milikmu
+    const firebaseConfig = {
+      apiKey: "AIzaSyBJu0X9CIzVK63RzklvLwyM7dl-zic-6gU",
+      authDomain: "kotak-saran-e198b.firebaseapp.com",
+      projectId: "kotak-saran-e198b",
+      storageBucket: "kotak-saran-e198b.appspot.com",
+      messagingSenderId: "444075080100",
+      appId: "1:444075080100:web:223d8d20446d37703ca931",
+      measurementId: "G-RD40HHK2T3"
+    };
+
+    // Inisialisasi Firebase
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    const provider = new firebase.auth.GoogleAuthProvider();
+
+    // 1. Fungsi Login menggunakan Redirect
+    function loginGoogle() {
+      auth.signInWithRedirect(provider);
+    }
+
+    // 2. Memeriksa Status Autentikasi User
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        document.getElementById('login-section').classList.add('hidden');
+        document.getElementById('form-section').classList.remove('hidden');
+        document.getElementById('user-name').innerText = user.displayName || user.email;
+        cekSaranPengguna(user.uid);
+      } else {
+        document.getElementById('login-section').classList.remove('hidden');
+        document.getElementById('form-section').classList.add('hidden');
+      }
+    });
+
+    // 3. Menangkap Hasil Redirect setelah Login
+    auth.getRedirectResult().catch(error => {
+      console.error("Error Login:", error.message);
+      document.getElementById('status').innerText = "Gagal login: " + error.message;
+    });
+
+    // 4. Cek Apakah User Sudah Pernah Kirim Saran
+    function cekSaranPengguna(userId) {
+      db.collection("saran").doc(userId).get().then(doc => {
+        if (doc.exists) {
+          document.getElementById('saran-input').disabled = true;
+          document.getElementById('btn-kirim').disabled = true;
+          document.getElementById('status').innerText = "Anda sudah mengirimkan saran. Terima kasih!";
+          document.getElementById('status').style.color = "green";
+        }
+      });
+    }
+
+    // 5. Fungsi Kirim Saran ke Firestore
+    function kirimSaran() {
+      const me = auth.currentUser;
+      const teksSaran = document.getElementById('saran-input').value.trim();
+
+      if (!teksSaran) {
+        alert("Saran tidak boleh kosong!");
+        return;
+      }
+
+      document.getElementById('btn-kirim').disabled = true;
+
+      db.collection("saran").doc(me.uid).set({
+        userId: me.uid,
+        nama: me.displayName,
+        email: me.email,
+        saran: teksSaran,
+        waktu: firebase.firestore.FieldValue.serverTimestamp()
+      })
+      .then(() => {
+        document.getElementById('saran-input').disabled = true;
+        document.getElementById('status').innerText = "Saran berhasil dikirim!";
+        document.getElementById('status').style.color = "green";
+      })
+      .catch(error => {
+        console.error("Gagal mengirim:", error);
+        document.getElementById('btn-kirim').disabled = false;
+        alert("Gagal mengirim saran: " + error.message);
+      });
+    }
+  </script>
+</body>
+  </html>
